@@ -25,7 +25,7 @@ class SlabAu_model(meep_utils.AbstractMeepModel):
 	#Y C, Ahn Y H, Yee K J, Park J W, Kim J, Park Q H and Lienau C 2003 Phys. Rev. Lett. 91 143901
 
 
-	self.simulation_name = "SlabAuSubsCont3"    
+	self.simulation_name = "SlabAuSubsCont3NoMedia"    
         self.src_freq = 375e12     # [Hz] (note: srcwidth irrelevant for continuous_source)
 	self.src_width= 160e12
 	self.interesting_frequencies=(250e12,500e12)
@@ -45,9 +45,10 @@ class SlabAu_model(meep_utils.AbstractMeepModel):
         ## Define materials
         f_c = c / np.pi/self.resolution/meep_utils.meep.use_Courant()
 
-        self.materials   = [meep_materials.material_Au(where=self.where_Au)]
+	self.materials = []
+        #self.materials   = [meep_materials.material_Au(where=self.where_Au)]
 	#self.materials[0].pol[1:3]=[]
-	self.materials += [meep_materials.material_dielectric(eps=3.133,where=self.where_sapphire)]
+	#self.materials += [meep_materials.material_dielectric(eps=3.133,where=self.where_sapphire)]
 	#self.materials += [meep_materials.material_Sapphire(where=self.where_sapphire)]
 
         for material in self.materials: self.fix_material_stability(material, f_c=2e15,
