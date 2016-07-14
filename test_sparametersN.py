@@ -25,7 +25,7 @@ class SlabAu_model(meep_utils.AbstractMeepModel):
 	#Y C, Ahn Y H, Yee K J, Park J W, Kim J, Park Q H and Lienau C 2003 Phys. Rev. Lett. 91 143901
 
 
-	self.simulation_name = "SlabAuSubsCont3NoMedia"    
+	self.simulation_name = "SlabAuSubsCont3Gauss" 
         self.src_freq = 375e12     # [Hz] (note: srcwidth irrelevant for continuous_source)
 	self.src_width= 160e12
 	self.interesting_frequencies=(250e12,500e12)
@@ -45,10 +45,10 @@ class SlabAu_model(meep_utils.AbstractMeepModel):
         ## Define materials
         f_c = c / np.pi/self.resolution/meep_utils.meep.use_Courant()
 
-	self.materials = []
-        #self.materials   = [meep_materials.material_Au(where=self.where_Au)]
+	#self.materials = []
+        self.materials   = [meep_materials.material_Au(where=self.where_AuGauss)]
 	#self.materials[0].pol[1:3]=[]
-	#self.materials += [meep_materials.material_dielectric(eps=3.133,where=self.where_sapphire)]
+	#self.materials += [meep_materials.material_dielectric(eps=4.0, where=self.where_sapphire)]#(eps=3.133,where=self.where_sapphire)]
 	#self.materials += [meep_materials.material_Sapphire(where=self.where_sapphire)]
 
         for material in self.materials: self.fix_material_stability(material, f_c=2e15,
@@ -74,7 +74,18 @@ class SlabAu_model(meep_utils.AbstractMeepModel):
 	   in_zslab(r,cz = -self.depthz/2, d = self.depthz)):
             return self.return_value             # (do not change this line)
         return 0
-    
+   
+    def where_AuGauss(self,r):
+        if(self.Nslits % 2 == 0):
+	    print('Number of slits must be an odd number')
+            exit(-1)
+	cxa = [-((self.Nslits-1)/2)*self.period + self.period*i for i in range(self.Nslits)]
+	zind = np.array([-self.depthz*np.exp(-(r.x()-centers)**2/(2*self.depthx**2))for centers in cxa])
+        ztot = np.sum(zind,axis=0)
+        if (r.z() <0 and r.z() < ztot and r.z() > -self.thickness_Au):
+              return self.return_value
+        return 0 
+
     def where_sapphire(self,r):
         '''
 	if in_zslab(r, cz = -self.thickness_Au - self.thickness_sapphire/2, d = self.thickness_sapphire):
