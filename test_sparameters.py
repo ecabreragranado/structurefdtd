@@ -15,17 +15,17 @@ import meep_mpi as meep
 #import meep
 
 class SlabAu_model(meep_utils.AbstractMeepModel):
-    def __init__(self, simtime=3.5e-13, resolution =4e-9,size_x = 3.75e-6, size_y = 0.1e-6,
+    def __init__(self, simtime=3.5e-13, resolution =4e-9,size_x = 2.25e-6, size_y = 0.1e-6,
                  size_z = 8e-7, thickness_Au = 1.5e-7,depthx = 5e-8, depthz = 1e-7,
 	         thickness_sapphire = 2e-7, #1.6e-7,
-	         period =7.5e-7, Nslits =5, **other_args):
+	         period =7.5e-7, Nslits =3, **other_args):
 	meep_utils.AbstractMeepModel.__init__(self) #Inizialitation of the class
 	
 	# Sapphire substrate thickness taken from Kim D S, Hohng S C, Malyarchuk V, Yoon 
 	#Y C, Ahn Y H, Yee K J, Park J W, Kim J, Park Q H and Lienau C 2003 Phys. Rev. Lett. 91 143901
 
 
-	self.simulation_name = "SlabAuSubsCont5Drude"    
+	self.simulation_name = "SlabSubsCont3GaussSapphire" 
         self.src_freq = 375e12     # [Hz] (note: srcwidth irrelevant for continuous_source)
 	self.src_width= 160e12
 	self.interesting_frequencies=(250e12,500e12)
@@ -45,8 +45,9 @@ class SlabAu_model(meep_utils.AbstractMeepModel):
         ## Define materials
         f_c = c / np.pi/self.resolution/meep_utils.meep.use_Courant()
 
-        self.materials   = [meep_materials.material_Au(where=self.where_Au)]
-	self.materials[0].pol[1:]=[]
+	#self.materials = []
+        self.materials   = [meep_materials.material_Au(where=self.where_AuGauss)]
+	#self.materials[0].pol[1:3]=[]
 	self.materials += [meep_materials.material_dielectric(eps=3.133,where=self.where_sapphire)]
 	#self.materials += [meep_materials.material_Sapphire(where=self.where_sapphire)]
 
@@ -73,7 +74,18 @@ class SlabAu_model(meep_utils.AbstractMeepModel):
 	   in_zslab(r,cz = -self.depthz/2, d = self.depthz)):
             return self.return_value             # (do not change this line)
         return 0
-    
+   
+    def where_AuGauss(self,r):
+        if(self.Nslits % 2 == 0):
+	    print('Number of slits must be an odd number')
+            exit(-1)
+	cxa = [-((self.Nslits-1)/2)*self.period + self.period*i for i in range(self.Nslits)]
+	zind = np.array([-self.depthz*np.exp(-(r.x()-centers)**2/(2*self.depthx**2))for centers in cxa])
+        ztot = np.sum(zind,axis=0)
+        if (r.z() <0 and r.z() < ztot and r.z() > -self.thickness_Au):
+              return self.return_value
+        return 0 
+
     def where_sapphire(self,r):
         '''
 	if in_zslab(r, cz = -self.thickness_Au - self.thickness_sapphire/2, d = self.thickness_sapphire):
@@ -136,24 +148,20 @@ slices += [meep_utils.Slice(model=model, field=f, components=meep.Ex, at_z=model
 
 f.step(); timer = meep_utils.Timer(simtime=model.simtime); meep.quiet(True) # use custom progress messages
 controlsample = 0
-x,y = [],[]
 while (f.time()/c < model.simtime):     # timestepping cycle
     f.step()
     timer.print_progress(f.time()/c)
     for monitor in (monitor1_Ex, monitor1_Hy, monitor2_Ex, monitor2_Hy): monitor.record(field=f)
-    x.append(f.time()/c); 
-    y.append(f.get_field(meep.Ex, monitor_point)+f.get_field(meep.Ey, monitor_point)+f.get_field(meep.Ez, monitor_point))
+    #filesample = open('./'+model.simulation_name + '/Exsampleafter.dat','a')
+    #filesample.write(str(f.time()/c)+' ')
+    #filesample.write(str(f.get_field(meep.Ex, meep.vec(0, 0,model.monitor_z1)))+'\n')
+    #filesample.close()	
     for slice_ in slices: slice_.poll(f.time()/c)
 for slice_ in slices: slice_.finalize()
 meep_utils.notify(model.simulation_name, run_time=timer.get_time())
 
+## Get the reflection and transmission of the structure
 if meep.my_rank() == 0:
-    ## Convert to polar notation and save the time-domain record
-    x, y = np.array(x), np.array(y)
-    meep_utils.savetxt(fname='./'+model.simulation_name+"/sample_timedomain.dat", X=zip(x, np.abs(y), meep_utils.get_phase(y)), fmt="%.6e",
-            header=model.parameterstring + "#x-column time [s]\n#column ampli\n#column phase\n")
-
-    ## Get the reflection and transmission of the structure
     freq, s11, s12, headerstring = meep_utils.get_s_parameters(monitor1_Ex, monitor1_Hy, monitor2_Ex, monitor2_Hy,             
             intf=getattr(model, 'interesting_frequencies', [0, model.src_freq+model.src_width]),
             pad_zeros=1.0, Kx=model_param.get('Kx', 0), Ky=model_param.get('Ky', 0),eps1=3.133,eps2=1.0)
